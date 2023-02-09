@@ -7,7 +7,10 @@ use App\Http\Requests\OrderRequest;
 use App\Models\Order;
 use App\Models\OrderProduct;
 use App\Models\Product;
+use Illuminate\Bus\Dispatcher;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
@@ -30,6 +33,8 @@ class OrderController extends Controller
     public function store(OrderRequest $request)
     {
         Try {
+            DB::beginTransaction();
+
             $allCount = $request->count;
 
             $allPrice = $request->price;
@@ -53,13 +58,14 @@ class OrderController extends Controller
                     'sum' => $allPrice[$key]
                 ]);
             });
+            DB::commit();
 
             return response()->json([
                 'code' => 200,
                 'message' => 'success'
             ]);
         } catch (\Exception $exception){
-
+            DB::rollBack();
             return response()->json([
                 'code' => $exception->getCode(),
                 'message' => $exception->getMessage(),
@@ -85,6 +91,7 @@ class OrderController extends Controller
     public function update(OrderRequest $request, Order $order)
     {
         Try {
+            DB::beginTransaction();
             $allCount = $request->count;
 
             $allPrice = $request->price;
@@ -118,12 +125,17 @@ class OrderController extends Controller
                 ->get()
                 ->each(fn($orderproduct) => $orderproduct->delete());
 
+            DB::commit();
+
             return response()->json([
                 'code' => 200,
                 'message' => 'success'
             ]);
 
         } catch (\Exception $exception) {
+
+            DB::rollBack();
+
             return response()->json([
                 'code' => $exception->getCode(),
                 'message' => $exception->getMessage(),
@@ -147,5 +159,14 @@ class OrderController extends Controller
                 'message' => $exception->getMessage(),
             ]);
         }
+    }
+
+    public function sortLike($request, $collection1)
+    {
+        $collection = new Collection();
+        foreach ($request->products_id as $id) {
+            $collection->push($collection1->firstWhere('id', $id));
+        }
+        return $collection;
     }
 }
